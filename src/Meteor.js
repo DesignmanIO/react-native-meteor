@@ -89,8 +89,8 @@ module.exports = {
       ...options,
     });
 
-    NetInfo.isConnected.addEventListener('connectionChange', isConnected => {
-      if (isConnected && Data.ddp.autoReconnect) {
+    NetInfo.addEventListener((state) => {
+      if (state.isConnected && Data.ddp.autoReconnect) {
         Data.ddp.connect();
       }
     });
@@ -126,7 +126,7 @@ module.exports = {
       lastDisconnect = new Date();
     });
 
-    Data.ddp.on('added', message => {
+    Data.ddp.on('added', (message) => {
       if (!Data.db[message.collection]) {
         Data.db.addCollection(message.collection);
       }
@@ -136,7 +136,7 @@ module.exports = {
       });
     });
 
-    Data.ddp.on('ready', message => {
+    Data.ddp.on('ready', (message) => {
       const idsMap = new Map();
       for (var i in Data.subscriptions) {
         const sub = Data.subscriptions[i];
@@ -153,10 +153,10 @@ module.exports = {
       }
     });
 
-    Data.ddp.on('changed', message => {
+    Data.ddp.on('changed', (message) => {
       const unset = {};
       if (message.cleared) {
-        message.cleared.forEach(field => {
+        message.cleared.forEach((field) => {
           unset[field] = null;
         });
       }
@@ -169,18 +169,21 @@ module.exports = {
         });
     });
 
-    Data.ddp.on('removed', message => {
+    Data.ddp.on('removed', (message) => {
       Data.db[message.collection] &&
         Data.db[message.collection].del(message.id);
     });
-    Data.ddp.on('result', message => {
-      const call = Data.calls.find(call => call.id == message.id);
+    Data.ddp.on('result', (message) => {
+      const call = Data.calls.find((call) => call.id == message.id);
       if (typeof call.callback == 'function')
         call.callback(message.error, message.result);
-      Data.calls.splice(Data.calls.findIndex(call => call.id == message.id), 1);
+      Data.calls.splice(
+        Data.calls.findIndex((call) => call.id == message.id),
+        1
+      );
     });
 
-    Data.ddp.on('nosub', message => {
+    Data.ddp.on('nosub', (message) => {
       for (var i in Data.subscriptions) {
         const sub = Data.subscriptions[i];
         if (sub.subIdRemember == message.id) {
@@ -264,7 +267,7 @@ module.exports = {
         readyDeps: new Trackr.Dependency(),
         readyCallback: callbacks.onReady,
         stopCallback: callbacks.onStop,
-        stop: function() {
+        stop: function () {
           Data.ddp.unsub(this.subIdRemember);
           delete Data.subscriptions[this.id];
           this.ready && this.readyDeps.changed();
@@ -278,10 +281,10 @@ module.exports = {
 
     // return a handle to the application.
     var handle = {
-      stop: function() {
+      stop: function () {
         if (Data.subscriptions[id]) Data.subscriptions[id].stop();
       },
-      ready: function() {
+      ready: function () {
         if (!Data.subscriptions[id]) return false;
 
         var record = Data.subscriptions[id];
@@ -298,12 +301,12 @@ module.exports = {
       // as a change to mark the subscription "inactive" so that it can
       // be reused from the rerun.  If it isn't reused, it's killed from
       // an afterFlush.
-      Trackr.onInvalidate(function(c) {
+      Trackr.onInvalidate(function (c) {
         if (Data.subscriptions[id]) {
           Data.subscriptions[id].inactive = true;
         }
 
-        Trackr.afterFlush(function() {
+        Trackr.afterFlush(function () {
           if (Data.subscriptions[id] && Data.subscriptions[id].inactive) {
             handle.stop();
           }
